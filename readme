@@ -1,0 +1,96 @@
+# 🌍 TravelProject
+
+**여행한 장소를 기록하고 시각화하는 사용자 중심의 여행 기록 서비스**
+
+- 사용자는 지도를 기반으로 여행 장소에 마커를 등록하고, 각 위치에 메모를 작성할 수 있습니다.
+- JWT 인증 기반으로 개인별 데이터가 안전하게 저장되고, 커스터마이징된 여행 히스토리를 확인할 수 있습니다.
+
+---
+
+## 🛠️ 기술 스택
+
+| 계층          | 기술명                                      |
+|---------------|----------------------------------------------|
+| Language      | Java 17                                      |
+| Framework     | Spring Boot 3.x, Spring Security             |
+| Database      | MySQL (local), Spring Data JPA               |
+| API 문서화    | Swagger (Springdoc OpenAPI)                  |
+| 인증          | JWT (Token 기반 인증 및 인가)               |
+| IDE/Build     | IntelliJ IDEA, Gradle                        |
+| 배포 및 관리  | Git, GitHub                                  |
+| 기타          | Lombok, Validation, Kakao Map API (지도 기능)|
+
+---
+
+## 📌 주요 기능
+
+| 기능 구분       | 상세 설명                                                                 |
+|----------------|---------------------------------------------------------------------------|
+| 🔐 회원가입/로그인 | JWT를 사용한 사용자 인증 구현 (Spring Security 적용)                     |
+| 🗺️ 지도에 마커 등록 | 사용자가 방문한 장소를 Kakao Map을 통해 시각적으로 등록 가능                |
+| 📝 메모 저장       | 마커에 메모(텍스트)를 저장하여 여행의 세부 정보 기록 가능                   |
+| 🧑‍🤝‍🧑 사용자별 구분 | 로그인한 사용자 기준으로 마커 및 메모를 구분하여 자신만의 여행 히스토리 관리 |
+| 📄 Swagger API 문서| Swagger UI로 API 테스트 및 명세 제공                                     |
+
+---
+
+## 🧭 프로젝트 흐름 요약
+
+### 🔸 1. 사용자 인증
+
+- 로그인 성공 시 JWT 발급  
+- 모든 API 요청 시 JWT를 통해 사용자 식별  
+- 인증 정보는 `Spring Security + UserDetailsService`로 처리
+
+### 🔸 2. 마커 등록 및 조회
+
+- 프론트에서 지도 위 좌표 전달
+- 백엔드에서 해당 좌표 및 메모, 사용자 ID를 DB에 저장
+- 사용자별로 마커를 필터링해 클라이언트에 전달
+
+### 🔸 3. 연관관계 처리
+
+- Marker ↔ User 간 연관관계 (`ManyToOne`)  
+- `user.setId()`를 통해 단방향으로 연동하고, 저장 시 JPA 자동 반영
+
+---
+
+## 🚧 Trouble Shooting 사례 (실무 기반)
+
+### 1️⃣ 마커 저장 시 사용자 정보 누락
+- **문제**: 마커 저장 시 User 객체가 null이 되어 `ConstraintViolationException` 발생
+- **원인**: Controller에서 `@AuthenticationPrincipal`을 활용해 User 정보를 받지 않음
+- **해결**: 로그인한 사용자의 username을 기반으로 `UserRepository.findByUsername()` 실행 후, Marker에 바인딩하여 저장 처리
+
+---
+
+### 2️⃣ 프론트엔드에서 마커 API 호출 시 403 Forbidden 발생
+- **문제**: 토큰은 존재하지만 API 호출 시 권한 거부
+- **원인**: Spring Security 설정에서 `HttpSecurity`의 permitAll과 authenticated 구간 미분리
+- **해결**: `/api/auth/**`는 permitAll, `/api/marker/**`는 authenticated로 명시 분리
+
+---
+
+### 3️⃣ CORS 오류로 프론트에서 API 요청 실패
+- **문제**: 프론트(localhost:3000)에서 백엔드(localhost:8080)로 요청 시 CORS 오류
+- **해결**:
+  - `WebMvcConfigurer`를 통해 전역 CORS 허용 설정
+  - 또는 특정 프론트 도메인만 허용: `allowedOrigins("http://localhost:3000")`
+
+---
+
+### 4️⃣ 카카오 지도 마커가 사용자 로그인 시마다 초기화됨
+- **문제**: 로그인할 때마다 마커가 초기화되어 사용자 히스토리가 보이지 않음
+- **해결**: 백엔드에서 JWT 기반 사용자 ID로 필터링하여 해당 사용자 마커만 반환되도록 수정
+
+---
+
+## 🚀 실행 방법
+
+```bash
+# 1. MySQL 실행 및 DB 준비
+# 2. application.properties 설정
+
+# 3. 빌드 및 실행
+./gradlew clean build
+java -jar build/libs/TravelProject-0.0.1-SNAPSHOT.jar
