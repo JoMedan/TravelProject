@@ -1,170 +1,115 @@
-🌍 TravelProject
+# 🌍 TravelProject
 
-여행한 장소를 기록하고 시간적으로 보기하는 사용자 중심의 여행 기록 서비스
+여행한 장소를 기록하고 시간 순으로 확인하는 사용자 중심의 여행 기록 서비스입니다.
 
-사용자는 지도에 바탕해 여행 장소에 마커를 등록하고, 각 위치에 메모를 작성할 수 있습니다.
+사용자는 지도를 기반으로 방문한 장소에 마커를 등록하고, 각 위치에 메모를 작성할 수 있습니다. JWT 기반 인증 시스템으로 사용자별로 안전하게 데이터를 저장하며, 개인화된 여행 기록 확인이 가능합니다.
 
-JWT 인증 기반으로 개인별 데이터가 안전히 저장되고, 클라이언트는 자신의 여행 기록을 확인할 수 있습니다.
+---
 
-🛠️ 기술 스택
+## 🛠️ 기술 스택
 
-계층
+| 계층 | 기술명 |
+|------|--------|
+| Language | Java 17 |
+| Framework | Spring Boot 3.x, Spring Security |
+| Database | MySQL (local), Spring Data JPA |
+| API 문서화 | Swagger (Springdoc OpenAPI) |
+| 인증 | JWT (JSON Web Token) |
+| IDE/Build Tool | IntelliJ IDEA, Gradle |
+| 기타 | Lombok, Validation, Kakao Map API (지도 기능) |
 
-기술명
+---
 
-Language
+## 📌 주요 기능
 
-Java 17
+| 기능 구분 | 상세 설명 |
+|----------|-----------|
+| 🔐 회원가입/로그인 | JWT를 사용한 사용자 인증 (Spring Security 기반) |
+| 🗺️ 지도에 마커 등록 | 사용자가 방문한 장소를 Kakao Map으로 위치 지정 후 등록 |
+| 📝 메모 저장 | 각 마커에 텍스트 메모를 저장 |
+| 🧑‍🤝‍🧑 사용자별 마커 구분 | 로그인한 사용자에 따라 저장된 마커/메모 구분 |
+| 📄 Swagger 문서 제공 | Swagger UI로 API 테스트 및 명세 제공 |
 
-Framework
+---
 
-Spring Boot 3.x, Spring Security
+## 🧠 핵심 로직 흐름 요약
 
-Database
+### 1. 사용자 인증
 
-MySQL (local), Spring Data JPA
+- 로그인 성공 시 JWT 발급 및 전달
+- 이후 모든 API 요청 시 Authorization 헤더에 JWT 포함
+- JWT 파싱 → 인증 객체 생성 → `SecurityContextHolder`에 저장
 
-API 문서화
+### 2. 마커 등록
 
-Swagger (Springdoc OpenAPI)
+- 프론트에서 전달받은 `lat`, `lng`, `memo`를 백엔드에서 받아 처리
+- 인증된 사용자 정보를 기반으로 해당 마커와 사용자 연동 후 저장
+- 사용자별 마커 조회 시 로그인된 사용자 기준으로 필터링
 
-인증
+### 3. 연관관계 매핑
 
-JWT (가상 토큰 기반 인증 및 인가)
+- `User (1) ↔ Marker (N)` 단방향 연관관계
+- Marker 저장 시 `marker.setUser(User)` 설정 후 JPA가 자동 연동 처리
 
-IDE/Build
+---
 
-IntelliJ IDEA, Gradle
+## 🚧 Trouble Shooting (실제 사용자 시나리오 기반)
 
-배포 및 관리
+### 1️⃣ 사용자 마커 저장 실패 (ConstraintViolationException)
 
-Git, GitHub
+- **문제**: 마커 저장 시 `User` 정보가 null로 저장됨 → 외래키 제약 위반 발생
+- **원인**: `@AuthenticationPrincipal`을 통해 로그인 사용자 정보를 받지 않음
+- **해결**: JWT 토큰에서 사용자명 추출 후, `userRepository.findByUsername()` 호출하여 직접 유저 객체 바인딩
 
-기타
+### 2️⃣ 프론트에서 마커 저장 시 403 Forbidden 발생
 
-Lombok, Validation, Kakao Map API (지도 기능)
+- **문제**: 로그인 상태인데도 마커 등록 API에서 403 오류 발생
+- **원인**: Security 설정에서 `/marker/**` 경로에 `authenticated()` 적용 누락
+- **해결**: Spring Security의 `HttpSecurity` 설정에서 명확히 `/auth/**`는 `permitAll`, 그 외는 `authenticated()`로 구분
 
-📌 주요 기능
+### 3️⃣ 프론트 요청 시 CORS 오류
 
-기능 구분
+- **문제**: 프론트(localhost:3000)에서 백엔드(localhost:8080)로 요청 시 CORS 에러 발생
+- **해결**: `WebMvcConfigurer`를 통해 CORS 전역 허용 추가 or `allowedOrigins("http://localhost:3000")` 명시
 
-상세 설명
+### 4️⃣ 마커 초기화 문제
 
-🔐 회원가입/로그인
+- **문제**: 로그인할 때마다 기존 마커들이 사라짐
+- **원인**: 사용자별 필터링 로직이 누락되어 전체 마커 중 로그인 사용자 필터링 안됨
+- **해결**: `markerRepository.findAllByUserId()`로 사용자 기준 조회 로직 수정
 
-JWT를 사용한 사용자 인증 구현 (Spring Security 적용)
+---
 
-🗺️ 지도에 마커 등록
+## 🗂 ERD
 
-사용자가 방문한 장소를 Kakao Map을 통해 시간적으로 등록 가능
+```
+User (1) ───────────────┐
+                       │
+                  (N) Marker
 
-📝 메모 저장
+User: id, username, password, roles
+Marker: id, lat, lng, memo, user_id (FK)
+```
 
-마커에 메모(텍스트)를 저장하여 여행의 세부 정보 기록 가능
+---
 
-🧑‍🤝‍🧑 사용자별 구분
+## 💡 확장 아이디어
 
-로그인한 사용자 기준으로 마커 및 메모를 구분하여 자신만의 여행 기록 관리
+- 여행 사진 업로드 기능 (AWS S3 등 활용한 멀티파트 업로드)
+- 친구 초대 및 마커 공유 기능
+- 날짜 필터 기반 여행일지 조회
+- 마커 위치 기반 자동 태그 기능
 
-📄 Swagger API 문서
+---
 
-Swagger UI로 API 테스트 및 명세 제공
+## 👨‍💻 개발자
 
-🗝 프로젝트 호랑 요약
+| 이름 | 역할 |
+|------|------|
+| JoMedan | 백엔드 개발, 인증/보안 구현, API 설계 |
 
-🔸 1. 사용자 인증
+---
 
-로그인 성공 시 JWT 발급
+## 🔗 GitHub
 
-모든 API 요청 시 JWT를 통해 사용자 시그니처
-
-인증 정보는 Spring Security + UserDetailsService로 처리
-
-🔸 2. 마커 등록 및 조회
-
-프론트에서 지도 위 좌표 전달
-
-백엔드에서 해당 좌표 및 메모, 사용자 ID를 DB에 저장
-
-사용자별로 마커를 필터링해 클라이언트에 전달
-
-🔸 3. 연관관계 처리
-
-Marker ↔ User 간 연관관계 (ManyToOne)
-
-user.setId()를 통해 단방환으로 연동하고, 저장 시 JPA 자동 반영
-
-🚧 Trouble Shooting 사례 (실무 기반)
-
-1️⃣ 마커 저장 시 사용자 정보 누르기
-
-문제: 마커 저장 시 User 객체가 null이 되어 ConstraintViolationException 발생
-
-원인: Controller에서 @AuthenticationPrincipal을 활용하여 User 정보를 받지 않음
-
-해결: 로그인한 사용자의 username을 기반으로 UserRepository.findByUsername() 실행 후, Marker에 바인딩해서 저장
-
-2️⃣ 프론트에서 마커 API 호출 시 403 Forbidden 발생
-
-문제: 토큰은 존재하지만 API 호출 시 권한 거리
-d- 원인: Spring Security 설정에서 HttpSecurity의 permitAll과 authenticated 구가 미분리
-
-해결: /api/auth/**는 permitAll, /api/marker/**는 authenticated로 명시 분리
-
-3️⃣ CORS 오류로 프론트에서 API 요청 실패
-
-문제: 프론트(localhost:3000)에서 백엔드(localhost:8080)로 요청 시 CORS 오류
-
-해결:
-
-WebMvcConfigurer를 통해 전역 CORS 허용 설정
-
-또는 특정 프론트 도메인만 허용: allowedOrigins("http://localhost:3000")
-
-4️⃣ 카카오 지도 마커가 사용자 로그인 시마다 초기화됨
-
-문제: 로그인할 때마다 마커가 초기화되어 사용자 히스토리가 보이지 않음
-
-해결: 백엔드에서 JWT 기반 사용자 ID로 필터링해보기로 수정
-
-🚀 실행 방법
-
-# 1. MySQL 시작 및 DB 준비
-# 2. application.properties 설정
-
-# 3. 빌드 및 실행
-./gradlew clean build
-java -jar build/libs/TravelProject-0.0.1-SNAPSHOT.jar
-
-✅ ERD (데이터베이스 설계)
-
-User (1) ─────────────────────────────────────┐
-                                    │
-                                (N) Marker
-
-User: username, password, roles
-
-Marker: id, memo, lat, lng, user_id
-
-👨‍💼 개발자
-
-이름
-
-역할
-
-JoMedan
-
-백엔드 개발, API 구현, 인증 보안 처리
-
-💡 개선 및 확장 아이디어
-
-📌 여행 사진 업로드 기능 (머티파트 업로드 → AWS S3 등 연동)
-
-📍 친구의 마커 공유 기능 (친구 관계 매포)
-
-📆 여행 일지 날짜별 분류 및 필터링 기능
-
-🔗 기타
-
-GitHub 저장소: https://github.com/JoMedan/TravelProject
-
+[🔗 GitHub 저장소](https://github.com/JoMedan/TravelProject)
